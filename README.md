@@ -1,41 +1,144 @@
-# CareerScout — Submission Package
+# CareerScout — Step 9.1: classification fixes and evidence quality
 
-**Bounty:** Job Portal / Careers Finder — TinyFish Student Bounty Drop 001  
-**Build:** CareerScout Step 9.1 (local Node.js web app; Step 8 live evidence retained)  
-**Package status:** Assembled for final review; **not yet cleared for submission** based on the attached live run.
+CareerScout is a local Node.js application for the TinyFish Careers Finder bounty. Step 9.1 is a classification-focused patch on top of Step 8. It preserves Search → Fetch → bounded crawling and fixes the observed false-positive patterns found in the Step 8 live report: ATS-host attribution (for example, Greenhouse shown instead of Glean) and a generic “Internship Openings” or role-prefixed “Software Engineering Internship Program” page classified as an individual vacancy. These changes are covered by fixtures; run a fresh live test before submission.
 
-## What's included
+## Requirements
 
-- `app/` — Step 9.1 application source with ATS/employer attribution and generic-opening/program-title classification fixes, plus regression tests.
-- `evidence/Step8-Live-Run.pdf` — the live-run report supplied after testing Step 8.
-- `docs/SUBMISSION_DRAFT.md` — copy-ready project description and truthful TinyFish usage notes.
-- `docs/TECHNICAL_OVERVIEW.md` — architecture and API-flow explanation.
-- `docs/LIVE_VALIDATION.md` — quantitative results and issues observed in the live report.
-- `docs/KNOWN_LIMITATIONS_AND_BLOCKERS.md` — issues to resolve before representing this as submission-ready.
-- `docs/FINAL_ACCEPTANCE_CHECKLIST.md` — final verification list.
-- `docs/CLASSIFICATION_FIXES.md` — exact Step 9.1 classification changes and fixture coverage.
-- `submission-assets/` — drafts for LinkedIn, X and Discord `#showcase`, plus a demo walkthrough.
+- Node.js 22 or newer
+- TinyFish API key from https://agent.tinyfish.ai/api-keys
+- Internet access
+- TinyFish documentation: https://docs.tinyfish.ai
 
-## Run the app
+No third-party npm packages are required.
 
-Requires Node.js 22+ and a TinyFish API key. No third-party npm packages are required.
+## Run on Windows PowerShell
 
-1. Open PowerShell in `app/`.
-2. Run `Copy-Item .env.example .env`.
-3. Edit `.env` and set `TINYFISH_API_KEY=...`. Never share or commit `.env`.
-4. Run `npm start`.
-5. Visit `http://127.0.0.1:3000`.
+1. Extract the ZIP into a new folder, for example `Documents\CareerScout-Step9.1`.
+2. Open PowerShell in that folder and run:
 
-Run fixture tests with `npm test` inside `app/`. The Step 9.1 test suite has 33 fixture-based tests; these do not make paid TinyFish requests.
+   ```powershell
+   Copy-Item .env.example .env
+   notepad .env
+   ```
 
-## Official bounty rules and final-submission warning
+3. Add your API key after `TINYFISH_API_KEY=` in `.env`. Keep this file local. Do not paste the key into chat, frontend code, screenshots, or a public repository.
+4. Save the file, then run:
 
-Read `docs/BOUNTY_RULES_AND_SUBMISSION_PLAN.md` and `docs/FINAL_ACCEPTANCE_CHECKLIST.md`. The supplied rules permit one individual submission per person per bounty, and submissions are final. The bounty is open for 18 days from its launch date; check the actual deadline in the dashboard. Only the top three builds are approved, so passing basic tests does not guarantee approval. A LinkedIn post tagging TinyFish and a Discord `#showcase` post are required. X is optional under the general rules unless the specific Careers Finder bounty instructions explicitly require it. Never include API keys or personal data.
+   ```powershell
+   npm start
+   ```
 
-## Before you submit
+5. Open http://127.0.0.1:3000.
 
-Read `docs/KNOWN_LIMITATIONS_AND_BLOCKERS.md` first. The attached Step 8 live test is honest evidence of working Search/Fetch plumbing, but it also exposes weak result quality: **40 leads, 15 pages fetched, 2 job candidates, 0 strong matches, and 1 direct-apply-style link**. Step 9.1 contains code-level fixes for ATS/company attribution plus generic internship and role-prefixed program-page false positives; these are regression-tested but still need a fresh live check before submission.
+The server binds to `127.0.0.1` and prints whether a key is configured. `/api/health` confirms local configuration only; it does not validate the key with TinyFish.
 
-The Step 9.1 application uses **TinyFish Search and Fetch**. It does **not** call the TinyFish Agent API in this release. Do not claim Agent integration unless it is implemented and verified and the bounty's criteria are checked against the original brief.
+## Step 8 base features retained
 
-The application currently runs locally; this package does not contain a public deployment URL or repository URL. Fill those into the submission draft only after publishing them.
+### 1. Optional expanded discovery
+
+The **Discovery breadth** control offers:
+
+- **Standard — 1 search query:** lower-cost default.
+- **Expanded — up to 3 search queries:** a preference search, a specific-posting search, and an employer/ATS-oriented search. Expanded mode may consume more API credits.
+
+Search variants are run independently. If one variant fails but another succeeds, the app continues with the successful results and reports failed variants in the normalized summary. If every variant fails, the app returns a meaningful error.
+
+### 2. Source diversity
+
+Initial Fetch targets are selected round-robin across query variants, deduplicated by canonical URL, and biased toward distinct hosts. This reduces the chance that the first Fetch batch is spent entirely on one job board.
+
+### 3. Better application-link evidence
+
+TinyFish link objects and Markdown anchors are parsed for labels such as `Apply`, `Apply Now`, and `Submit application`, even if the URL path itself does not contain the word `apply`. Specific ATS role links receive priority during bounded crawling. The interface distinguishes direct-apply-style links from role pages, filtered searches, related careers pages, and fallbacks.
+
+**Important:** a direct-application label is based on explicit link evidence, not a click test. CareerScout does not submit applications or guarantee that the destination is live.
+
+### 4. Field-level evidence and deduplication
+
+Normalized records retain evidence for title, location, seniority, eligibility, and application route. Cross-source records with the same normalized title, company, and location can be merged while retaining stronger application-link and eligibility evidence. Different locations are kept distinct.
+
+### 5. Existing fit checks retained
+
+Role-title signals carry more weight than incidental body mentions. Explicit location and seniority mismatches are penalized, uncertain internship level is flagged for review, and generic job-board landing pages remain source leads rather than individual openings.
+
+### 6. Bounded API usage
+
+- At most 5 URLs per Fetch batch.
+- At most 3 Fetch batches (15 attempted page URLs per discovery).
+- Standard mode uses one Search query; expanded mode uses up to three.
+- Search variants that fail are reported in a visible Search strategy diagnostics panel; one failed source does not discard other successful results.
+- Result filters operate client-side and do not trigger another paid search.
+
+## Discovery flow
+
+1. Read user preferences and choose standard or expanded breadth.
+2. Build one or three role/location/keyword/seniority-aware TinyFish Search queries.
+3. Parse `data.results[]`, merge query variants, and select a diverse initial Fetch batch.
+4. Fetch pages in batches of up to five and follow relevant job/career links for at most two more passes.
+5. Normalize fetched text and labeled links, merge redirects/errors, and deduplicate records.
+6. Classify individual-opening candidates separately from careers pages and generic aggregators.
+7. Extract title, company, location, eligibility excerpt, deadline text, application route, source provenance, and field-level evidence where supported.
+8. Score role, keyword, location, and seniority fit heuristically and display review/mismatch labels.
+
+## API routes
+
+- `GET /api/health` — local service status and whether the API key is configured.
+- `GET /api/search?query=...&location=IN&language=en` — raw TinyFish Search response for debugging.
+- `POST /api/fetch` with `{ "urls": ["https://example.com/careers"] }` — TinyFish Fetch, 1–5 URLs per request.
+- `POST /api/discover` — complete preference-based Search → Fetch → link-crawl → normalization pipeline.
+
+Example `/api/discover` request:
+
+```json
+{
+  "role": "quant research internship",
+  "location": "India",
+  "keywords": "finance, C++, machine learning",
+  "seniority": "Intern",
+  "visa": "No preference",
+  "countryCode": "IN",
+  "language": "en",
+  "searchBreadth": "expanded"
+}
+```
+
+## Test suite
+
+Run:
+
+```powershell
+npm test
+```
+
+The 33 fixture-based tests cover TinyFish response shapes, multi-level crawling, response merging, redirect and cross-source deduplication, blocked pages, job versus aggregator classification, location and seniority fit, eligibility extraction, link-label interpretation, unsafe/unrelated links, field-level evidence, expanded query strategy, source diversity, ATS URL prioritization, ATS-vs-employer attribution, and generic opening-page suppression. Tests do not make paid TinyFish requests.
+
+## Live acceptance checks before submission
+
+Run at least three searches with materially different preferences:
+
+1. Software engineering internships in India.
+2. Remote data science internships.
+3. Quant research internships in India.
+
+For each run, check:
+- Search variants attempted/succeeded/failed match the selected breadth.
+- Candidate titles, employers, locations, and seniority make sense.
+- Individual openings remain separate from generic source pages.
+- Application-link labels match the available evidence.
+- Duplicate listings are merged without combining different locations.
+- Missing deadlines or eligibility are left blank rather than invented.
+- One blocked source does not fail the entire run.
+
+The crawler caps a run at 15 fetched page URLs, so it will not inspect every search result. A fetched page is not proof that a vacancy remains open.
+
+## Before bounty submission
+
+- Confirm the bounty's exact requirement for TinyFish Search, Fetch, and Agent usage. This project demonstrably uses Search and Fetch; do not claim Agent integration unless it is implemented and verified.
+- Prepare a working demo and source/repository link.
+- Include concise setup instructions and a short explanation of search, fetch, crawling, deduplication, and fit scoring.
+- Complete the required LinkedIn and X posts tagging TinyFish and the Discord `#showcase` post, following the bounty instructions provided to you.
+- Keep `.env` out of Git and screenshots.
+
+## Security and deployment limits
+
+This is a local prototype, not a hardened public deployment. The manual Fetch route rejects embedded URL credentials and localhost/non-public local hostnames, but it is not a complete outbound-network security boundary. Before hosting publicly, add authentication, rate limiting, comprehensive private-network/IP controls, redacted request logging, monitoring, and proper secret management. Do not expose the API key to browser code.

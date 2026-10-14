@@ -1,0 +1,15 @@
+{
+  "name": "careerscout-tinyfish",
+  "version": "0.9.1",
+  "private": true,
+  "description": "TinyFish-powered Careers Finder with stricter employer attribution, generic-page suppression, targeted multi-query discovery, evidence-based classification, bounded crawling and fit assessment",
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.js",
+    "dev": "node --watch --env-file-if-exists=.env server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
