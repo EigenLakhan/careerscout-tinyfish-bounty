@@ -1,4 +1,4 @@
-# CareerScout — Submission Package (Draft)
+# CareerScout — Submission Package
 
 **Bounty:** Job Portal / Careers Finder — TinyFish Student Bounty Drop 001  
 **Build:** CareerScout Step 9.1 (local Node.js web app; Step 8 live evidence retained)  
